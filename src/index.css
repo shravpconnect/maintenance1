@@ -53,6 +53,13 @@ All colors MUST be HSL.
     --sidebar-border: 220 13% 91%;
 
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Extended brand tokens */
+    --brand: 262 83% 57%;
+    --brand-2: 198 93% 60%;
+    --gradient-hero: linear-gradient(135deg, hsl(var(--brand)), hsl(var(--brand-2)));
+    --shadow-elevated: 0 20px 40px -12px hsl(var(--brand) / 0.25);
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .dark {
@@ -91,6 +98,13 @@ All colors MUST be HSL.
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Keep brand tokens consistent in dark mode */
+    --brand: 262 83% 57%;
+    --brand-2: 198 93% 60%;
+    --gradient-hero: linear-gradient(135deg, hsl(var(--brand)), hsl(var(--brand-2)));
+    --shadow-elevated: 0 20px 40px -12px hsl(var(--brand) / 0.4);
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 }
 
@@ -101,5 +115,24 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* Utilities and animations */
+@layer utilities {
+  @keyframes bg-pan {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 100% 50%; }
+  }
+
+  .gradient-hero {
+    background-image: var(--gradient-hero);
+    background-size: 200% 200%;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .animate-gradient-pan {
+      animation: bg-pan 10s ease-in-out infinite alternate;
+    }
   }
 }
