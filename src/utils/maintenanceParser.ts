@@ -45,20 +45,39 @@ function extractReferenceId(text: string): string {
     /CID:\s*([A-Za-z0-9._-]+)/i,
     /Reference(?:\s*ID)?:\s*([A-Za-z0-9._-]+)/i,
     /Service\s*ID:\s*([A-Za-z0-9._-]+)/i,
+    /Account(?:\s*Number)?:\s*([A-Za-z0-9._-]+)/i,
+    /Order(?:\s*Number)?:\s*([A-Za-z0-9._-]+)/i,
   ];
+  
   for (const p of patterns) {
     const m = p.exec(text);
     if (m) return m[1].trim();
   }
+  
   const mBelow = /Below\s+are\s+the\s+affected\s+circuit\(s\)?.*\n\s*(.+)/i.exec(text);
   if (mBelow) return mBelow[1].trim();
 
-  // Heuristic: choose an isolated token-like line that looks like a circuit id
+  // Look for common circuit ID patterns
+  const circuitPatterns = [
+    /\b[A-Z]{2,4}\.\d{3,6}\.+[A-Z]{2,4}\b/g, // Format like IUEC.639083..ATI
+    /\b[A-Z]{2,4}[0-9]{4,10}[A-Z]{0,4}\b/g,  // Format like ABC123456DEF
+    /\b\d{8,12}[A-Z]{2,4}\b/g                 // Format like 12345678ABC
+  ];
+  
+  for (const pattern of circuitPatterns) {
+    const matches = text.match(pattern);
+    if (matches && matches.length > 0) {
+      return matches[0];
+    }
+  }
+
+  // Heuristic fallback: find isolated alphanumeric tokens
   const tokenLine = text
     .split(/\r?\n/)
     .map((l) => l.trim())
     .find((l) => /[A-Za-z]/.test(l) && /[0-9]/.test(l) && /[._-]/.test(l) && l.length >= 5 && l.length <= 40);
-  return tokenLine || "";
+  
+  return tokenLine || "[Circuit ID]";
 }
 
 function extractReason(text: string): string {
@@ -73,6 +92,36 @@ function extractReason(text: string): string {
 
 type DateWindow = { start: string; end: string; tz: string };
 
+// State to timezone mapping for US states
+const STATE_TIMEZONES: Record<string, string> = {
+  // Eastern Time
+  'FL': 'EST', 'GA': 'EST', 'NC': 'EST', 'SC': 'EST', 'VA': 'EST', 'WV': 'EST',
+  'MD': 'EST', 'DE': 'EST', 'PA': 'EST', 'NJ': 'EST', 'NY': 'EST', 'CT': 'EST',
+  'RI': 'EST', 'MA': 'EST', 'VT': 'EST', 'NH': 'EST', 'ME': 'EST', 'OH': 'EST',
+  'MI': 'EST', 'IN': 'EST', 'KY': 'EST', 'TN': 'EST',
+  
+  // Central Time  
+  'TX': 'CST', 'OK': 'CST', 'AR': 'CST', 'LA': 'CST', 'MS': 'CST', 'AL': 'CST',
+  'MO': 'CST', 'IA': 'CST', 'MN': 'CST', 'WI': 'CST', 'IL': 'CST', 'KS': 'CST',
+  'NE': 'CST', 'SD': 'CST', 'ND': 'CST',
+  
+  // Mountain Time
+  'CO': 'MST', 'NM': 'MST', 'WY': 'MST', 'MT': 'MST', 'UT': 'MST', 'AZ': 'MST',
+  'ID': 'MST', 'NV': 'MST',
+  
+  // Pacific Time
+  'CA': 'PST', 'OR': 'PST', 'WA': 'PST', 'AK': 'AKST', 'HI': 'HST'
+};
+
+function detectTimezoneFromAddress(address: string): string {
+  const stateMatch = address.match(/\b([A-Z]{2})\b/);
+  if (stateMatch) {
+    const state = stateMatch[1];
+    return STATE_TIMEZONES[state] || '';
+  }
+  return '';
+}
+
 function normalizeDate(d: Date) {
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
@@ -85,17 +134,31 @@ function normalizeDate(d: Date) {
   return `${mm}/${dd}/${yyyy} ${hh}:${min} ${ampm}`;
 }
 
-function parseDateWindow(text: string): DateWindow | null {
+function parseDateWindow(text: string, address: string = ""): DateWindow | null {
   // Date formats: 09/11/2025 or Sep 11, 2025
   const dateRegex = /(\b\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}\b|\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{2,4}\b)/i;
   const timeWindowRegex = /(\d{1,2}:?\d{0,2}\s*(?:AM|PM)?)[\s]*[-to]+[\s]*(\d{1,2}:?\d{0,2}\s*(?:AM|PM)?)/i;
-  const tzRegex = /(local\s*time|\b[A-Z]{2,4}\b|UTC)/i;
+  const tzRegex = /(local\s*time|\b[A-Z]{2,4}T\b|\bEST\b|\bCST\b|\bMST\b|\bPST\b|\bEDT\b|\bCDT\b|\bMDT\b|\bPDT\b|UTC)/i;
 
   const dateMatch = dateRegex.exec(text);
   const timeMatch = timeWindowRegex.exec(text);
   const tzMatch = tzRegex.exec(text);
 
-  const tz = tzMatch ? tzMatch[1].replace(/\s+/g, " ").trim() : "";
+  let tz = tzMatch ? tzMatch[1].replace(/\s+/g, " ").trim() : "";
+  
+  // If no timezone found in text, try to detect from address
+  if (!tz && address) {
+    const detectedTz = detectTimezoneFromAddress(address);
+    if (detectedTz) {
+      tz = detectedTz;
+    }
+  }
+  
+  // Default to "Local Time" if still no timezone
+  if (!tz) {
+    tz = "Local Time";
+  }
+  
   if (!timeMatch && !dateMatch) return null;
 
   const dateStr = dateMatch ? dateMatch[1] : new Date().toLocaleDateString("en-US");
@@ -171,14 +234,14 @@ function extractDuration(text: string, window: DateWindow | null): string {
 }
 
 export function parseMaintenanceEmail(text: string): ParsedFields {
-  const carrier = extractCarrier(text) || "";
-  const address = extractAddress(text) || "";
-  const referenceId = extractReferenceId(text) || "";
-  const reason = extractReason(text) || "";
-  const window = parseDateWindow(text);
-  const timeLength = extractDuration(text, window) || "";
-  const startTime = window?.start || "";
-  const endTime = window?.end || "";
+  const carrier = extractCarrier(text) || "[Carrier Name]";
+  const address = extractAddress(text) || "[Service Address]";
+  const referenceId = extractReferenceId(text) || "[Circuit ID]";
+  const reason = extractReason(text) || "[Maintenance Reason]";
+  const window = parseDateWindow(text, address);
+  const timeLength = extractDuration(text, window) || "[Duration]";
+  const startTime = window?.start || "[Start Time]";
+  const endTime = window?.end || "[End Time]";
 
   return { carrier, address, referenceId, timeLength, reason, startTime, endTime };
 }

@@ -21,15 +21,13 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="gradient-hero animate-gradient-pan">
-        <div className="container mx-auto py-16">
-          <h1 className="text-4xl md:text-5xl font-bold text-primary-foreground text-center">Maintenance Note Generator</h1>
-          <p className="mt-3 text-primary-foreground/90 text-center max-w-2xl mx-auto">Paste any raw carrier maintenance email and instantly get a clean, client-ready note using the exact required template.</p>
+    <div className="bg-background py-8">
+      <div className="container mx-auto space-y-8">
+        <div className="text-center space-y-4">
+          <h1 className="text-4xl md:text-5xl font-bold gradient-hero bg-clip-text text-transparent">Maintenance Note Generator</h1>
+          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">Paste any raw carrier maintenance email and instantly get a clean, client-ready note using the exact required template.</p>
         </div>
-      </header>
 
-      <main className="container mx-auto -mt-10 pb-20">
         <Card className="mx-auto max-w-4xl shadow-lg">
           <CardHeader>
             <CardTitle className="text-xl">Input</CardTitle>
@@ -49,17 +47,15 @@ const Index = () => {
           </CardContent>
         </Card>
 
-        <section className="mx-auto max-w-4xl mt-8">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-xl">Output</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <pre className="whitespace-pre-wrap text-sm md:text-base leading-relaxed">{note}</pre>
-            </CardContent>
-          </Card>
-        </section>
-      </main>
+        <Card className="mx-auto max-w-4xl">
+          <CardHeader>
+            <CardTitle className="text-xl">Output</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <pre className="whitespace-pre-wrap text-sm md:text-base leading-relaxed">{note}</pre>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };
