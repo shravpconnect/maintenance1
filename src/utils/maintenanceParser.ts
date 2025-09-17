@@ -6,6 +6,16 @@ export type ParsedFields = {
   reason: string;
   startTime: string; // formatted string
   endTime: string; // formatted string
+  maintenanceType: string; // "scheduled" or "emergency"
+  ticketNumber: string; // carrier's trouble ticket number
+  confidence: {
+    carrier: boolean;
+    address: boolean;
+    referenceId: boolean;
+    reason: boolean;
+    times: boolean;
+    ticketNumber: boolean;
+  };
 };
 
 function extractCarrier(text: string): string {
@@ -87,6 +97,37 @@ function extractReason(text: string): string {
   if (m2) return m2[1].trim();
   const m3 = /Reason:\s*(.+)/i.exec(text);
   if (m3) return m3[1].trim();
+  return "";
+}
+
+function extractMaintenanceType(text: string): string {
+  // Look for emergency keywords first
+  if (/emergency|urgent|unplanned|immediate/i.test(text)) {
+    return "emergency";
+  }
+  
+  // Look for scheduled keywords
+  if (/scheduled|planned|maintenance/i.test(text)) {
+    return "scheduled";
+  }
+  
+  return "scheduled"; // default
+}
+
+function extractTicketNumber(text: string): string {
+  const patterns = [
+    /trouble ticket number is\s*([A-Za-z0-9-]+)/i,
+    /ticket\s*(?:number|#):\s*([A-Za-z0-9-]+)/i,
+    /reference\s*(?:number|#):\s*([A-Za-z0-9-]+)/i,
+    /work\s*order\s*(?:number|#):\s*([A-Za-z0-9-]+)/i,
+    /case\s*(?:number|#):\s*([A-Za-z0-9-]+)/i,
+  ];
+  
+  for (const pattern of patterns) {
+    const match = pattern.exec(text);
+    if (match) return match[1].trim();
+  }
+  
   return "";
 }
 
@@ -238,12 +279,35 @@ export function parseMaintenanceEmail(text: string): ParsedFields {
   const address = extractAddress(text) || "[Service Address]";
   const referenceId = extractReferenceId(text) || "[Circuit ID]";
   const reason = extractReason(text) || "[Maintenance Reason]";
+  const maintenanceType = extractMaintenanceType(text);
+  const ticketNumber = extractTicketNumber(text) || "[Ticket Number]";
   const window = parseDateWindow(text, address);
   const timeLength = extractDuration(text, window) || "[Duration]";
   const startTime = window?.start || "[Start Time]";
   const endTime = window?.end || "[End Time]";
 
-  return { carrier, address, referenceId, timeLength, reason, startTime, endTime };
+  // Confidence scoring based on whether fields contain placeholder text
+  const confidence = {
+    carrier: !carrier.includes("[") && carrier.length > 2,
+    address: !address.includes("[") && address.length > 5,
+    referenceId: !referenceId.includes("[") && referenceId.length > 3,
+    reason: !reason.includes("[") && reason.length > 3,
+    times: window !== null,
+    ticketNumber: !ticketNumber.includes("[") && ticketNumber.length > 0,
+  };
+
+  return { 
+    carrier, 
+    address, 
+    referenceId, 
+    timeLength, 
+    reason, 
+    startTime, 
+    endTime, 
+    maintenanceType,
+    ticketNumber,
+    confidence 
+  };
 }
 
 export function buildNote(p: ParsedFields): string {
@@ -254,14 +318,14 @@ export function buildNote(p: ParsedFields): string {
   const REASON = p.reason || "";
   const START = p.startTime || "";
   const END = p.endTime || "";
+  const TYPE = p.maintenanceType || "scheduled";
 
-  return `Hello Team,
-Please be advised, ${CARRIER} will be performing scheduled/emergency maintenance that will impact your service at location ${ADDRESS}.
+  return `Please be advised, **${CARRIER}** will be performing **${TYPE} maintenance** that will impact your service at location **${ADDRESS}**.
 
-Your vCom provided circuit ${REFERENCE} will be subject to an outage lasting ${DURATION} during this maintenance window (Please note this is an estimate and no guarantee of actual impact). This maintenance is for ${REASON}
+Your vCom provided circuit **${REFERENCE}** will be subject to an outage lasting **${DURATION}** during this maintenance window (Please note this is an estimate and no guarantee of actual impact). This maintenance is for **${REASON}**
 
-Start time: ${START}
-End time: ${END}
+Start time: **${START}**  
+End time: **${END}**  
 
 If you experience service issues after that window, you may need to reboot your equipment. If you continue to have any problems, call our toll-free Technical Support number 800-804-8266 opt 3, and refer to this ticket for further assistance.
 
