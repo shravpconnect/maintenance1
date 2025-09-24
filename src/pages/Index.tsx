@@ -113,7 +113,10 @@ Address: 2398 E CAMELBACK RD PHOENIX, AZ 85016"
                     <p className="text-sm text-muted-foreground">{parsed.carrier}</p>
                   </div>
                   <div className={cn("flex items-center gap-1", getConfidenceColor(parsed.confidence.carrier))}>
-                    {getConfidenceIcon(parsed.confidence.carrier)({ className: "h-4 w-4" })}
+                    {(() => {
+                      const Icon = getConfidenceIcon(parsed.confidence.carrier);
+                      return <Icon className="h-4 w-4" />;
+                    })()}
                   </div>
                 </div>
 
@@ -133,7 +136,10 @@ Address: 2398 E CAMELBACK RD PHOENIX, AZ 85016"
                     <p className="text-sm text-muted-foreground">{parsed.referenceId}</p>
                   </div>
                   <div className={cn("flex items-center gap-1", getConfidenceColor(parsed.confidence.referenceId))}>
-                    {getConfidenceIcon(parsed.confidence.referenceId)({ className: "h-4 w-4" })}
+                    {(() => {
+                      const Icon = getConfidenceIcon(parsed.confidence.referenceId);
+                      return <Icon className="h-4 w-4" />;
+                    })()}
                   </div>
                 </div>
 
@@ -143,7 +149,10 @@ Address: 2398 E CAMELBACK RD PHOENIX, AZ 85016"
                     <p className="text-sm text-muted-foreground">{parsed.address}</p>
                   </div>
                   <div className={cn("flex items-center gap-1", getConfidenceColor(parsed.confidence.address))}>
-                    {getConfidenceIcon(parsed.confidence.address)({ className: "h-4 w-4" })}
+                    {(() => {
+                      const Icon = getConfidenceIcon(parsed.confidence.address);
+                      return <Icon className="h-4 w-4" />;
+                    })()}
                   </div>
                 </div>
 
@@ -153,7 +162,10 @@ Address: 2398 E CAMELBACK RD PHOENIX, AZ 85016"
                     <p className="text-sm text-muted-foreground">{parsed.timeLength}</p>
                   </div>
                   <div className={cn("flex items-center gap-1", getConfidenceColor(parsed.confidence.times))}>
-                    {getConfidenceIcon(parsed.confidence.times)({ className: "h-4 w-4" })}
+                    {(() => {
+                      const Icon = getConfidenceIcon(parsed.confidence.times);
+                      return <Icon className="h-4 w-4" />;
+                    })()}
                   </div>
                 </div>
 
@@ -163,7 +175,10 @@ Address: 2398 E CAMELBACK RD PHOENIX, AZ 85016"
                     <p className="text-sm text-muted-foreground">{parsed.ticketNumber}</p>
                   </div>
                   <div className={cn("flex items-center gap-1", getConfidenceColor(parsed.confidence.ticketNumber))}>
-                    {getConfidenceIcon(parsed.confidence.ticketNumber)({ className: "h-4 w-4" })}
+                    {(() => {
+                      const Icon = getConfidenceIcon(parsed.confidence.ticketNumber);
+                      return <Icon className="h-4 w-4" />;
+                    })()}
                   </div>
                 </div>
               </div>
