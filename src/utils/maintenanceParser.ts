@@ -19,16 +19,21 @@ export type ParsedFields = {
 };
 
 function extractCarrier(text: string): string {
-  const lines = text.split(/\r?\n/);
+  // Enhanced carrier detection patterns from Python backend
   const dear = /Dear\s+(.+?)\s+(?:IP|Internet|Business|Network)?\s*Services?\s*Customer/i.exec(text);
   if (dear) return dear[1].trim();
 
-  const willPerf = /(.*?)\s+(?:Network\s+Engineers|Engineers)\s+will\s+be\s+performing/i.exec(text);
+  const networkEngineers = /(.*?)\s+(?:Network\s+Engineers|Engineers)\s+will\s+be\s+performing/i.exec(text);
+  if (networkEngineers) return networkEngineers[1].trim();
+
+  const accessProvider = /access provider['\s]*s?\s+engineers\s+will\s+be\s+performing/i.exec(text);
+  if (accessProvider) return "AT&T"; // Common pattern in AT&T emails
+
+  const willPerf = /(.*?)\s+will\s+be\s+performing\b/i.exec(text);
   if (willPerf) return willPerf[1].trim();
 
-  const willPerf2 = /(.*?)\s+will\s+be\s+performing\b/i.exec(text);
-  if (willPerf2) return willPerf2[1].trim();
-
+  // Look for carrier names in maintenance context
+  const lines = text.split(/\r?\n/);
   for (const l of lines) {
     const m = /(from|by)\s+([A-Za-z][A-Za-z& .-]{1,50})\b.*maintenance/i.exec(l);
     if (m) return m[2].trim();
@@ -40,16 +45,28 @@ function extractCarrier(text: string): string {
 }
 
 function extractAddress(text: string): string {
-  const m1 = /Address:\s*(.+)/i.exec(text);
-  if (m1) return m1[1].trim();
-  const m2 = /Service\s*Location:\s*(.+)/i.exec(text);
-  if (m2) return m2[1].trim();
-  const m3 = /Location:\s*(.+)/i.exec(text);
-  if (m3) return m3[1].trim();
+  // Enhanced address extraction patterns from Python backend
+  const addressPattern1 = /Address:\s*(.+?)(?:Please note|$)/is.exec(text);
+  if (addressPattern1) return addressPattern1[1].trim();
+  
+  const addressPattern2 = /Service\s*Location:\s*(.+)/i.exec(text);
+  if (addressPattern2) return addressPattern2[1].trim();
+  
+  const addressPattern3 = /Location:\s*(.+)/i.exec(text);
+  if (addressPattern3) return addressPattern3[1].trim();
+  
+  // Look for address patterns with ZIP codes
+  const zipPattern = /([^.\n]+\s+[A-Z]{2}\s+\d{5}(?:-\d{4})?)/i.exec(text);
+  if (zipPattern) return zipPattern[1].trim();
+  
   return "";
 }
 
 function extractReferenceId(text: string): string {
+  // Enhanced circuit ID extraction patterns from Python backend
+  const belowPattern = /Below\s+are\s+the\s+affected\s+circuit\(s\).*?\n\s*(\S+)/is.exec(text);
+  if (belowPattern) return belowPattern[1].trim();
+
   const patterns = [
     /Circuit(?:\s*ID)?:\s*([A-Za-z0-9._-]+)/i,
     /CID:\s*([A-Za-z0-9._-]+)/i,
@@ -63,13 +80,10 @@ function extractReferenceId(text: string): string {
     const m = p.exec(text);
     if (m) return m[1].trim();
   }
-  
-  const mBelow = /Below\s+are\s+the\s+affected\s+circuit\(s\)?.*\n\s*(.+)/i.exec(text);
-  if (mBelow) return mBelow[1].trim();
 
-  // Look for common circuit ID patterns
+  // Enhanced circuit ID patterns based on real-world examples
   const circuitPatterns = [
-    /\b[A-Z]{2,4}\.\d{3,6}\.+[A-Z]{2,4}\b/g, // Format like IUEC.639083..ATI
+    /\b[A-Z]{2,4}\.\d{3,6}\.+[A-Z]{2,4}\b/g, // Format like IUEC.796938..ATI
     /\b[A-Z]{2,4}[0-9]{4,10}[A-Z]{0,4}\b/g,  // Format like ABC123456DEF
     /\b\d{8,12}[A-Z]{2,4}\b/g                 // Format like 12345678ABC
   ];
@@ -87,16 +101,27 @@ function extractReferenceId(text: string): string {
     .map((l) => l.trim())
     .find((l) => /[A-Za-z]/.test(l) && /[0-9]/.test(l) && /[._-]/.test(l) && l.length >= 5 && l.length <= 40);
   
-  return tokenLine || "[Circuit ID]";
+  return tokenLine || "";
 }
 
 function extractReason(text: string): string {
-  const m1 = /performing\s+(?:a\(n\)\s*)?([^\n.]+)[\n.]/i.exec(text);
-  if (m1) return m1[1].trim();
-  const m2 = /maintenance\s+(?:is\s+)?for\s+([^\n.]+)[\n.]/i.exec(text);
-  if (m2) return m2[1].trim();
-  const m3 = /Reason:\s*(.+)/i.exec(text);
-  if (m3) return m3[1].trim();
+  // Enhanced reason extraction patterns from Python backend
+  const pattern1 = /performing\s+a\(n\)\s+(.+?)\./i.exec(text);
+  if (pattern1) return pattern1[1].trim();
+  
+  const pattern2 = /performing\s+(?:a\(n\)\s*)?([^\n.]+)[\n.]/i.exec(text);
+  if (pattern2) return pattern2[1].trim();
+  
+  const pattern3 = /maintenance\s+(?:is\s+)?for\s+([^\n.]+)[\n.]/i.exec(text);
+  if (pattern3) return pattern3[1].trim();
+  
+  const pattern4 = /Reason:\s*(.+)/i.exec(text);
+  if (pattern4) return pattern4[1].trim();
+  
+  // Look for maintenance activity descriptions
+  const pattern5 = /will\s+be\s+performing\s+(.+?)(?:\.|on|at)/i.exec(text);
+  if (pattern5) return pattern5[1].trim();
+  
   return "";
 }
 
@@ -115,7 +140,9 @@ function extractMaintenanceType(text: string): string {
 }
 
 function extractTicketNumber(text: string): string {
+  // Enhanced ticket number extraction patterns from Python backend
   const patterns = [
+    /trouble ticket number is\s+(\d+)/i, // Primary pattern from Python
     /trouble ticket number is\s*([A-Za-z0-9-]+)/i,
     /ticket\s*(?:number|#):\s*([A-Za-z0-9-]+)/i,
     /reference\s*(?:number|#):\s*([A-Za-z0-9-]+)/i,
@@ -133,7 +160,7 @@ function extractTicketNumber(text: string): string {
 
 type DateWindow = { start: string; end: string; tz: string };
 
-// State to timezone mapping for US states
+// Enhanced state to timezone mapping from Python backend
 const STATE_TIMEZONES: Record<string, string> = {
   // Eastern Time
   'FL': 'EST', 'GA': 'EST', 'NC': 'EST', 'SC': 'EST', 'VA': 'EST', 'WV': 'EST',
@@ -152,6 +179,17 @@ const STATE_TIMEZONES: Record<string, string> = {
   
   // Pacific Time
   'CA': 'PST', 'OR': 'PST', 'WA': 'PST', 'AK': 'AKST', 'HI': 'HST'
+};
+
+// Python backend timezone mapping for enhanced accuracy
+const PYTHON_STATE_TIMEZONE: Record<string, string> = {
+  'CA': 'US/Pacific',
+  'NY': 'US/Eastern', 
+  'TX': 'US/Central',
+  'FL': 'US/Eastern',
+  'WA': 'US/Pacific',
+  'IL': 'US/Central',
+  'MA': 'US/Eastern'
 };
 
 function detectTimezoneFromAddress(address: string): string {
@@ -176,22 +214,36 @@ function normalizeDate(d: Date) {
 }
 
 function parseDateWindow(text: string, address: string = ""): DateWindow | null {
-  // Date formats: 09/11/2025 or Sep 11, 2025
-  const dateRegex = /(\b\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}\b|\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{2,4}\b)/i;
-  const timeWindowRegex = /(\d{1,2}:?\d{0,2}\s*(?:AM|PM)?)[\s]*[-to]+[\s]*(\d{1,2}:?\d{0,2}\s*(?:AM|PM)?)/i;
+  // Enhanced date/time parsing patterns from Python backend
+  const dateRegex = /performed on (\d{2}\/\d{2}\/\d{4})/i; // Primary pattern from Python
+  const fallbackDateRegex = /(\b\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}\b|\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{2,4}\b)/i;
+  
+  const timeWindowRegex = /maintenance window of (\d{1,2}:\d{2}[AP]M)-(\d{1,2}:\d{2}[AP]M)/i; // Primary pattern from Python
+  const fallbackTimeRegex = /(\d{1,2}:?\d{0,2}\s*(?:AM|PM)?)[\s]*[-to]+[\s]*(\d{1,2}:?\d{0,2}\s*(?:AM|PM)?)/i;
+  
   const tzRegex = /(local\s*time|\b[A-Z]{2,4}T\b|\bEST\b|\bCST\b|\bMST\b|\bPST\b|\bEDT\b|\bCDT\b|\bMDT\b|\bPDT\b|UTC)/i;
 
-  const dateMatch = dateRegex.exec(text);
-  const timeMatch = timeWindowRegex.exec(text);
+  const dateMatch = dateRegex.exec(text) || fallbackDateRegex.exec(text);
+  const timeMatch = timeWindowRegex.exec(text) || fallbackTimeRegex.exec(text);
   const tzMatch = tzRegex.exec(text);
 
   let tz = tzMatch ? tzMatch[1].replace(/\s+/g, " ").trim() : "";
   
-  // If no timezone found in text, try to detect from address
+  // Enhanced timezone detection from address using Python patterns
   if (!tz && address) {
-    const detectedTz = detectTimezoneFromAddress(address);
-    if (detectedTz) {
-      tz = detectedTz;
+    const stateMatch = /,\s*([A-Z]{2})\s*\d{5}/.exec(address);
+    if (stateMatch) {
+      const state = stateMatch[1];
+      const pythonTz = PYTHON_STATE_TIMEZONE[state];
+      if (pythonTz) {
+        // Convert Python timezone names to abbreviations
+        if (pythonTz === 'US/Pacific') tz = 'PST';
+        else if (pythonTz === 'US/Eastern') tz = 'EST';
+        else if (pythonTz === 'US/Central') tz = 'CST';
+        else if (pythonTz === 'US/Mountain') tz = 'MST';
+      } else {
+        tz = STATE_TIMEZONES[state] || '';
+      }
     }
   }
   
@@ -261,15 +313,23 @@ function extractDuration(text: string, window: DateWindow | null): string {
     const mins = parseInt(minutesPattern[1], 10);
     return `${mins} minutes`;
   }
+  
+  // Enhanced duration calculation from Python backend
   if (window) {
     const s = new Date(window.start);
     const e = new Date(window.end);
     const diffMin = Math.round((e.getTime() - s.getTime()) / 60000);
     const hours = Math.floor(diffMin / 60);
     const mins = diffMin % 60;
-    if (mins === 0) return hours === 1 ? "1 hour" : `${hours} hours`;
-    if (hours === 0) return `${mins} minutes`;
-    return `${hours} hour${hours === 1 ? "" : "s"} ${mins} minutes`;
+    
+    // Python backend format: "6 Hours" or "30 Minutes"
+    if (mins === 0) {
+      return hours === 1 ? "1 Hour" : `${hours} Hours`;
+    }
+    if (hours === 0) {
+      return `${mins} Minutes`;
+    }
+    return `${hours} Hour${hours === 1 ? "" : "s"} ${mins} Minutes`;
   }
   return "";
 }
